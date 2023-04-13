@@ -1,0 +1,53 @@
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+from sklearn.decomposition import PCA
+from sklearn.cluster import KMeans
+from matplotlib.patches import Ellipse
+
+# Load data
+df = pd.read_csv('observations_sitting_lying.csv')
+
+# Apply PCA
+pca = PCA(n_components=2)
+X = df.iloc[:, 1:-2]
+X_pca = pca.fit_transform(X)
+
+# Determine optimal number of clusters
+wcss = []
+for i in range(1, 11):
+    kmeans = KMeans(n_clusters=i, init='k-means++', random_state=42)
+    kmeans.fit(X_pca)
+    wcss.append(kmeans.inertia_)
+plt.plot(range(1, 11), wcss)
+plt.title('Elbow Method')
+plt.xlabel('Number of clusters')
+plt.ylabel('WCSS')
+plt.show()
+
+# Fit K-Means to the dataset with optimal number of clusters
+n_clusters = 4
+kmeans = KMeans(n_clusters=n_clusters, init='k-means++', random_state=42)
+y_kmeans = kmeans.fit_predict(X_pca)
+
+# Visualize clusters with bigger ellipses
+fig, ax = plt.subplots()
+colors = ['blue', 'red', 'green', 'purple']
+for i in range(n_clusters):
+    ax.scatter(X_pca[y_kmeans == i, 0], X_pca[y_kmeans == i, 1], s=30, c=colors[i], label=f'Cluster {i+1}')
+    covariances = np.cov(X_pca[y_kmeans == i].T)
+    lambda_, v = np.linalg.eig(covariances)
+    lambda_ = np.sqrt(lambda_)
+    ellipse = Ellipse(xy=kmeans.cluster_centers_[i], width=lambda_[0]*4, height=lambda_[1]*4, angle=np.rad2deg(np.arccos(v[0, 0])), alpha=0.2, facecolor=colors[i], edgecolor='black')
+    ax.add_artist(ellipse)
+ax.legend()
+plt.title('Clusters of observations')
+plt.xlabel('Principal Component 1')
+plt.ylabel('Principal Component 2')
+plt.show()
+
+# Add cluster labels to DataFrame
+df['cluster'] = kmeans.labels_
+    
+# Save the updated DataFrame
+df.to_csv('sample_data_clustered.csv', index=False)
